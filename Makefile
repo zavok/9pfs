@@ -1,5 +1,5 @@
 BIN=/usr/local/bin
-MAN=/usr/local/share/man/man1
+MAN=/usr/share/man/man1
 TARG=9pfs
 OBJS=9pfs.o\
 	9p.o\
