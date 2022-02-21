@@ -30,7 +30,7 @@
 enum
 {
 	CACHECTLSIZE = 8, /* sizeof("cleared\n") - 1 */
-	MSIZE = 8192
+	Msize = 32768,
 };
 
 void	dir2stat(struct stat*, Dir*);
@@ -42,6 +42,12 @@ char	*breakpath(char*);
 void	usage(void);
 
 Dir	*rootdir;
+FILE	*logfile;
+FFid	*rootfid;
+FFid	*authfid;
+int	msize;
+int	srvfd;
+int	debug;
 
 int
 fsstat(const char *path, struct stat *st)
@@ -150,11 +156,13 @@ fsrename(const char *opath, const char *npath)
 	dname = estrdup(npath);
 	bname = strrchr(dname, '/');
 	if(strncmp(opath, npath, bname-dname) != 0){
+		_9pclunk(f);
 		free(dname);
 		return -EACCES;
 	}
 	*bname++ = '\0';
 	if((d = _9pstat(f)) == NULL){
+		_9pclunk(f);
 		free(dname);
 		return -EIO;
 	}
@@ -189,6 +197,7 @@ fsopen(const char *path, struct fuse_file_info *ffi)
 		return -EACCES;
 	}
 	ffi->fh = (u64int)f;
+	ffi->direct_io = 1;
 	return 0;
 }
 
@@ -278,7 +287,7 @@ fsread(const char *path, char *buf, size_t size, off_t off,
 		size = CACHECTLSIZE;
 		if(off >= size)
 			return 0;
-		memcpy(buf, "cleared\n" + off, size - off);
+		memcpy(buf, &"cleared\n"[off], size - off);
 		clearcache(path);
 		return size;
 	}
@@ -316,9 +325,8 @@ int
 fsopendir(const char *path, struct fuse_file_info *ffi)
 {
 	FFid	*f;
-	FDir	*d;
 
-	if((d = lookupdir(path, GET)) != NULL){
+	if(lookupdir(path, GET) != NULL){
 		ffi->fh = (u64int)NULL;
 		return 0;
 	}
@@ -537,7 +545,7 @@ main(int argc, char *argv[])
 		freeaddrinfo(ainfo);
 
 	init9p();
-	msize = _9pversion(MSIZE);
+	msize = _9pversion(Msize);
 	if(doauth){
 		authfid = _9pauth(AUTHFID, user, NULL);
 		ai = auth_proxy(authfid, auth_getkey, "proto=p9any role=client");
@@ -616,7 +624,6 @@ addtocache(const char *path)
 	FFid	*f;
 	Dir	*d;
 	char	*dname;
-	long	n;
 
 	DPRINT("addtocache %s\n", path);
 	dname = estrdup(path);
@@ -627,14 +634,17 @@ addtocache(const char *path)
 	}
 	f->mode |= O_RDONLY;
 	if(_9popen(f) == -1){
+		_9pclunk(f);
 		free(dname);
 		return NULL;
 	}
 	DPRINT("addtocache about to dirread\n");
-	if((n = _9pdirread(f, &d)) < 0){
+	if(_9pdirread(f, &d) < 0){
+		_9pclunk(f);
 		free(dname);
 		return NULL;
 	}
+	_9pclunk(f);
 	free(dname);
 	return iscached(path);
 }
