@@ -13,7 +13,6 @@ LDFLAGS+=$(shell pkg-config --libs fuse)
 
 OBJS=\
 	9p.o\
-	extern.o\
 	util.o\
 	lib/strecpy.o\
 	lib/convD2M.o\
