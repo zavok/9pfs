@@ -2,11 +2,11 @@ TARG=9pfs
 DESTDIR?=
 PREFIX?=/usr/local
 BIN=$(DESTDIR)$(PREFIX)/bin
-MAN=$(DESTDIR)$(PREFIX)/man1
+MAN=$(DESTDIR)$(PREFIX)/share/man/man1
 CFLAGS?=-O2 -pipe -g -Wall
 CFLAGS+=-D_FILE_OFFSET_BITS=64\
-	-DFUSE_USE_VERSION=28\
-	-D_DEFAULT_SOURCE\
+	-DFUSE_USE_VERSION=26\
+	-D_GNU_SOURCE\
 	$(shell pkg-config --cflags fuse)
 LDFLAGS?=
 LDFLAGS+=$(shell pkg-config --libs fuse)
@@ -34,14 +34,16 @@ default: $(TARG)
 
 install: $(TARG) $(TARG).1
 	install -d $(BIN)
-	install -m 555 $(TARG) $(BIN)
-	install -m 444 $(TARG).1 $(MAN)
+	install -m 755 $(TARG) $(BIN)
+	install -d $(MAN)
+	install -m 644 $(TARG).1 $(MAN)
 
 uninstall:
 	rm -f $(BIN)/$(TARG)
 	rm -f $(MAN)/$(TARG).1
 
 $(TARG): $(OBJS)
+	${CC} -o $@ ${OBJS} ${LDFLAGS}
 
 clean:
 	rm -f $(TARG) $(OBJS)
